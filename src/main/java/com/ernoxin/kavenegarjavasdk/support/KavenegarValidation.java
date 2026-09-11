@@ -171,11 +171,11 @@ public class KavenegarValidation {
      * @param receptor receptor
      * @param field    field name
      */
-    public static void requireReceptor(String receptor, String field) {
+    public static String requireReceptor(String receptor, String field) {
         requireNonBlank(receptor, field);
         String normalized = normalizeDigits(receptor);
         if (IRAN_MOBILE.matcher(normalized).matches() || INTERNATIONAL.matcher(normalized).matches()) {
-            return;
+            return normalized;
         }
         throw new KavenegarValidationException(field + " is not a valid receptor number");
     }
@@ -186,12 +186,13 @@ public class KavenegarValidation {
      * @param sender sender
      * @param field  field name
      */
-    public static void requireSender(String sender, String field) {
+    public static String requireSender(String sender, String field) {
         requireNonBlank(sender, field);
         String normalized = normalizeDigits(sender);
         if (!LINE_NUMBER.matcher(normalized).matches()) {
             throw new KavenegarValidationException(field + " is not a valid sender line");
         }
+        return normalized;
     }
 
     /**

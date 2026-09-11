@@ -108,6 +108,38 @@ public final class KavenegarHttpClient {
         }
     }
 
+    static String maskApiKeyInText(String text, String apiKey) {
+        if (text == null || apiKey == null || apiKey.isBlank()) {
+            return text;
+        }
+        String masked = text.replace(apiKey, "***");
+        String encodedKey = URLEncoder.encode(apiKey, StandardCharsets.UTF_8);
+        if (!encodedKey.equals(apiKey)) {
+            masked = masked.replace(encodedKey, "***");
+        }
+        return masked;
+    }
+
+    /**
+     * Builds a query URI with values percent-encoded up front (so {@code +} becomes {@code %2B}).
+     * Spring's default query encoder leaves {@code +} literal, which servers treat as space.
+     */
+    static URI buildQueryUri(URI base, Map<String, ?> query) {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUri(base);
+        if (query != null) {
+            for (Map.Entry<String, ?> entry : query.entrySet()) {
+                if (entry.getValue() != null) {
+                    builder.queryParam(entry.getKey(), urlEncode(String.valueOf(entry.getValue())));
+                }
+            }
+        }
+        return builder.build(true).toUri();
+    }
+
+    private static String urlEncode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
+    }
+
     /**
      * POST {@code application/x-www-form-urlencoded}. Never retried.
      *
@@ -242,7 +274,7 @@ public final class KavenegarHttpClient {
                     String.class
             );
         } catch (RestClientException ex) {
-            throw new KavenegarTransportException("Request to Kavenegar failed", ex);
+            throw new KavenegarTransportException("Request to Kavenegar failed", sanitizeTransportCause(ex));
         }
         if (response == null) {
             throw new KavenegarTransportException("Request to Kavenegar failed", null);
@@ -258,6 +290,16 @@ public final class KavenegarHttpClient {
         return headers;
     }
 
+    private RuntimeException sanitizeTransportCause(Throwable ex) {
+        if (ex == null) {
+            return null;
+        }
+        String message = maskApiKeyInText(ex.getMessage(), config.apiKey());
+        RuntimeException sanitized = new RuntimeException(message == null ? "transport failure" : message);
+        sanitized.setStackTrace(ex.getStackTrace());
+        return sanitized;
+    }
+
     private URI methodUri(String method) {
         return methodUri(config.apiKey(), method);
     }
@@ -271,15 +313,7 @@ public final class KavenegarHttpClient {
     }
 
     private URI queryUri(URI base, Map<String, ?> query) {
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUri(base);
-        if (query != null) {
-            for (Map.Entry<String, ?> entry : query.entrySet()) {
-                if (entry.getValue() != null) {
-                    builder.queryParam(entry.getKey(), entry.getValue());
-                }
-            }
-        }
-        return builder.build(true).toUri();
+        return buildQueryUri(base, query);
     }
 
     private HttpHeaders jsonHeaders() {
@@ -332,19 +366,22 @@ public final class KavenegarHttpClient {
             } catch (RestClientException ex) {
                 last = ex;
                 if (attempt == attempts) {
-                    throw new KavenegarTransportException("Request to Kavenegar failed", ex);
+                    throw new KavenegarTransportException("Request to Kavenegar failed", sanitizeTransportCause(ex));
                 }
                 if (backoffMillis > 0) {
                     try {
                         Thread.sleep(backoffMillis);
                     } catch (InterruptedException interrupted) {
                         Thread.currentThread().interrupt();
-                        throw new KavenegarTransportException("Request to Kavenegar failed", interrupted);
+                        throw new KavenegarTransportException(
+                                "Request to Kavenegar failed",
+                                sanitizeTransportCause(interrupted)
+                        );
                     }
                 }
             }
         }
-        throw new KavenegarTransportException("Request to Kavenegar failed", last);
+        throw new KavenegarTransportException("Request to Kavenegar failed", sanitizeTransportCause(last));
     }
 
     private String encodeForm(Map<String, ?> form) {
@@ -359,10 +396,6 @@ public final class KavenegarHttpClient {
             joiner.add(urlEncode(entry.getKey()) + "=" + urlEncode(String.valueOf(entry.getValue())));
         }
         return joiner.toString();
-    }
-
-    private String urlEncode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
     }
 
 }

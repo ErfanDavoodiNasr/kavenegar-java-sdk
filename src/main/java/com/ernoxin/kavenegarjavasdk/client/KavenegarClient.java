@@ -39,6 +39,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.MediaType;
 
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -131,8 +132,9 @@ public final class KavenegarClient {
             throw new KavenegarValidationException("send request is required");
         }
         KavenegarValidation.requireStringList(request.receptors(), config.maxRecipients(), "receptors");
+        List<String> normalizedReceptors = new ArrayList<>();
         for (String receptor : request.receptors()) {
-            KavenegarValidation.requireReceptor(receptor, "receptors");
+            normalizedReceptors.add(KavenegarValidation.requireReceptor(receptor, "receptors"));
         }
         KavenegarValidation.requireNonBlank(request.message(), "message");
         KavenegarValidation.requireMaxLength(request.message(), config.maxMessageLength(), "message");
@@ -151,7 +153,7 @@ public final class KavenegarClient {
             }
         }
         Map<String, Object> form = new LinkedHashMap<>();
-        form.put("receptor", KavenegarValidation.joinComma(request.receptors()));
+        form.put("receptor", KavenegarValidation.joinComma(normalizedReceptors));
         form.put("message", request.message());
         putIfPresent(form, "sender", sender);
         putIfPresent(form, "date", request.date());
@@ -183,11 +185,13 @@ public final class KavenegarClient {
                 || request.receptors().size() != request.messages().size()) {
             throw new KavenegarValidationException("receptor, sender, and message lists must be the same size");
         }
+        List<String> normalizedReceptors = new ArrayList<>();
         for (String receptor : request.receptors()) {
-            KavenegarValidation.requireReceptor(receptor, "receptor");
+            normalizedReceptors.add(KavenegarValidation.requireReceptor(receptor, "receptor"));
         }
+        List<String> normalizedSenders = new ArrayList<>();
         for (String sender : request.senders()) {
-            KavenegarValidation.requireSender(sender, "sender");
+            normalizedSenders.add(KavenegarValidation.requireSender(sender, "sender"));
         }
         for (String message : request.messages()) {
             KavenegarValidation.requireMaxLength(message, config.maxMessageLength(), "message");
@@ -213,8 +217,8 @@ public final class KavenegarClient {
             }
         }
         Map<String, Object> form = new LinkedHashMap<>();
-        form.put("receptor", writeJson(request.receptors()));
-        form.put("sender", writeJson(request.senders()));
+        form.put("receptor", writeJson(normalizedReceptors));
+        form.put("sender", writeJson(normalizedSenders));
         form.put("message", writeJson(request.messages()));
         putIfPresent(form, "date", request.date());
         if (request.types() != null) {
@@ -271,7 +275,7 @@ public final class KavenegarClient {
      * @return status rows
      */
     public List<ReceptorStatusResult> statusByReceptor(String receptor, long startDate, Long endDate) {
-        KavenegarValidation.requireReceptor(receptor, "receptor");
+        receptor = KavenegarValidation.requireReceptor(receptor, "receptor");
         KavenegarValidation.requirePositive(startDate, "startdate");
         KavenegarValidation.requireDateRange(startDate, endDate);
         Map<String, Object> query = new LinkedHashMap<>();
@@ -375,7 +379,7 @@ public final class KavenegarClient {
      * @return inbox rows (up to 100)
      */
     public List<InboxMessage> receive(String lineNumber, boolean unread) {
-        KavenegarValidation.requireSender(lineNumber, "linenumber");
+        lineNumber = KavenegarValidation.requireSender(lineNumber, "linenumber");
         Map<String, Object> query = new LinkedHashMap<>();
         query.put("linenumber", lineNumber);
         query.put("isread", unread ? 0 : 1);
@@ -399,7 +403,7 @@ public final class KavenegarClient {
             Long endDate,
             Integer pageNumber
     ) {
-        KavenegarValidation.requireSender(lineNumber, "linenumber");
+        lineNumber = KavenegarValidation.requireSender(lineNumber, "linenumber");
         KavenegarValidation.requireDateRange(startDate, endDate);
         KavenegarValidation.requirePositive(pageNumber, "pagenumber");
         Map<String, Object> query = new LinkedHashMap<>();
@@ -424,7 +428,7 @@ public final class KavenegarClient {
         KavenegarValidation.requirePositive(startDate, "startdate");
         KavenegarValidation.requireDateRange(startDate, endDate);
         if (lineNumber != null) {
-            KavenegarValidation.requireSender(lineNumber, "linenumber");
+            lineNumber = KavenegarValidation.requireSender(lineNumber, "linenumber");
         }
         Map<String, Object> query = new LinkedHashMap<>();
         query.put("startdate", startDate);
@@ -457,7 +461,7 @@ public final class KavenegarClient {
             Long startDate,
             Integer pageNumber
     ) {
-        KavenegarValidation.requireSender(lineNumber, "linenumber");
+        lineNumber = KavenegarValidation.requireSender(lineNumber, "linenumber");
         KavenegarValidation.requirePositive(pageNumber, "pagenumber");
         Map<String, Object> query = new LinkedHashMap<>();
         query.put("linenumber", lineNumber);
@@ -475,14 +479,15 @@ public final class KavenegarClient {
      * @return mutation rows
      */
     public List<BlockedMutationResult> addBlocked(String lineNumber, List<String> receptors) {
-        KavenegarValidation.requireSender(lineNumber, "linenumber");
+        lineNumber = KavenegarValidation.requireSender(lineNumber, "linenumber");
         KavenegarValidation.requireStringList(receptors, config.maxRecipients(), "receptor");
+        List<String> normalizedReceptors = new ArrayList<>();
         for (String receptor : receptors) {
-            KavenegarValidation.requireReceptor(receptor, "receptor");
+            normalizedReceptors.add(KavenegarValidation.requireReceptor(receptor, "receptor"));
         }
         Map<String, Object> form = new LinkedHashMap<>();
         form.put("linenumber", lineNumber);
-        form.put("receptor", KavenegarValidation.joinComma(receptors));
+        form.put("receptor", KavenegarValidation.joinComma(normalizedReceptors));
         return httpClient.postForm(KavenegarEndpoints.LINE_BLOCKED_ADD, form, blockedMutationListType);
     }
 
@@ -494,14 +499,15 @@ public final class KavenegarClient {
      * @return exists rows
      */
     public List<BlockedMutationResult> blockedExists(String lineNumber, List<String> receptors) {
-        KavenegarValidation.requireSender(lineNumber, "linenumber");
+        lineNumber = KavenegarValidation.requireSender(lineNumber, "linenumber");
         KavenegarValidation.requireStringList(receptors, config.maxRecipients(), "receptor");
+        List<String> normalizedReceptors = new ArrayList<>();
         for (String receptor : receptors) {
-            KavenegarValidation.requireReceptor(receptor, "receptor");
+            normalizedReceptors.add(KavenegarValidation.requireReceptor(receptor, "receptor"));
         }
         Map<String, Object> query = new LinkedHashMap<>();
         query.put("linenumber", lineNumber);
-        query.put("receptor", KavenegarValidation.joinComma(receptors));
+        query.put("receptor", KavenegarValidation.joinComma(normalizedReceptors));
         return httpClient.get(KavenegarEndpoints.LINE_BLOCKED_EXISTS, query, blockedMutationListType, true);
     }
 
@@ -513,14 +519,15 @@ public final class KavenegarClient {
      * @return remove result
      */
     public BlockedRemoveResult removeBlocked(String lineNumber, List<String> receptors) {
-        KavenegarValidation.requireSender(lineNumber, "linenumber");
+        lineNumber = KavenegarValidation.requireSender(lineNumber, "linenumber");
         KavenegarValidation.requireStringList(receptors, config.maxRecipients(), "receptor");
+        List<String> normalizedReceptors = new ArrayList<>();
         for (String receptor : receptors) {
-            KavenegarValidation.requireReceptor(receptor, "receptor");
+            normalizedReceptors.add(KavenegarValidation.requireReceptor(receptor, "receptor"));
         }
         Map<String, Object> query = new LinkedHashMap<>();
         query.put("linenumber", lineNumber);
-        query.put("receptor", KavenegarValidation.joinComma(receptors));
+        query.put("receptor", KavenegarValidation.joinComma(normalizedReceptors));
         return httpClient.delete(KavenegarEndpoints.LINE_BLOCKED_REMOVE, query, blockedRemoveType);
     }
 
@@ -534,7 +541,7 @@ public final class KavenegarClient {
         if (request == null) {
             throw new KavenegarValidationException("verify request is required");
         }
-        KavenegarValidation.requireReceptor(request.receptor(), "receptor");
+        String receptor = KavenegarValidation.requireReceptor(request.receptor(), "receptor");
         KavenegarValidation.requireToken(request.token(), "token");
         if (request.token2() != null) {
             KavenegarValidation.requireToken(request.token2(), "token2");
@@ -553,7 +560,7 @@ public final class KavenegarClient {
             }
         }
         Map<String, Object> form = new LinkedHashMap<>();
-        form.put("receptor", request.receptor());
+        form.put("receptor", receptor);
         form.put("token", request.token());
         putIfPresent(form, "token2", request.token2());
         putIfPresent(form, "token3", request.token3());
@@ -663,8 +670,9 @@ public final class KavenegarClient {
             throw new KavenegarValidationException("TTS request is required");
         }
         KavenegarValidation.requireStringList(request.receptors(), config.maxRecipients(), "receptor");
+        List<String> normalizedReceptors = new ArrayList<>();
         for (String receptor : request.receptors()) {
-            KavenegarValidation.requireReceptor(receptor, "receptor");
+            normalizedReceptors.add(KavenegarValidation.requireReceptor(receptor, "receptor"));
         }
         KavenegarValidation.requireNonBlank(request.message(), "message");
         KavenegarValidation.requireFutureUnix(request.date());
@@ -676,7 +684,7 @@ public final class KavenegarClient {
             }
         }
         Map<String, Object> form = new LinkedHashMap<>();
-        form.put("receptor", KavenegarValidation.joinComma(request.receptors()));
+        form.put("receptor", KavenegarValidation.joinComma(normalizedReceptors));
         form.put("message", request.message());
         putIfPresent(form, "date", request.date());
         if (request.localIds() != null) {
@@ -859,8 +867,7 @@ public final class KavenegarClient {
         if (sender == null) {
             return null;
         }
-        KavenegarValidation.requireSender(sender, "sender");
-        return sender;
+        return KavenegarValidation.requireSender(sender, "sender");
     }
 
     private void requireType(Integer type) {

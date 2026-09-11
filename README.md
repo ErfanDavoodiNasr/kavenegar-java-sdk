@@ -227,17 +227,9 @@ client.send(new SendRequest(
         List.of("09121234567"),
         "یادآوری",
                 "10004346",
-                Instant.
-
-now().
-
-plus(2,ChronoUnit.HOURS).
-
-getEpochSecond(),
+                Instant.now().plus(2, ChronoUnit.HOURS).getEpochSecond(),
         1,
-                List.
-
-of("order-1001"),
+                List.of("order-1001"),
         0,
                 "campaign-a",
                 null,

@@ -40,4 +40,17 @@ class KavenegarValidationTest {
     void joinsComma() {
         assertEquals("1,2,3", KavenegarValidation.joinComma(List.of(1, 2, 3)));
     }
+
+    @Test
+    void returnsNormalizedReceptorWithoutSpacesOrDashes() {
+        assertEquals("09121234567", KavenegarValidation.requireReceptor("0912-123-4567", "receptor"));
+        assertEquals("09121234567", KavenegarValidation.requireReceptor("0912 123 4567", "receptor"));
+        assertEquals("+989121234567", KavenegarValidation.requireReceptor("+98 912 123 4567", "receptor"));
+    }
+
+    @Test
+    void returnsNormalizedSender() {
+        assertEquals("10004346", KavenegarValidation.requireSender("1000-4346", "sender"));
+    }
+
 }
